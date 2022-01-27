@@ -1,0 +1,75 @@
+#include <pcap.h>
+#include <stdbool.h>
+#include <stdio.h>
+#include "dot11.h"
+
+void hexdump(const u_char * packet, bpf_u_int32 len);
+
+void usage() {
+    printf("syntax: airodump <interface>\n");
+    printf("sample: airodump mon0\n");
+}
+
+typedef struct {
+    char* dev_;
+} Param;
+
+Param param  = {
+    .dev_ = NULL
+};
+
+bool parse(Param* param, int argc, char* argv[]) {
+    if (argc != 2) {
+        usage();
+        return false;
+    }
+    param->dev_ = argv[1];
+    return true;
+}
+
+int main(int argc, char *argv[])
+{
+    if (!parse(&param, argc, argv))
+        return -1;
+
+    char errbuf[PCAP_ERRBUF_SIZE];
+    pcap_t* pcap = pcap_open_live(param.dev_, BUFSIZ, 1, 1000, errbuf);
+    if (pcap == NULL) {
+        fprintf(stderr, "pcap_open_live(%s) return null - %s\n", param.dev_, errbuf);
+        return -1;
+    }
+
+    Dot11 dot11;
+
+    while (true) {
+        struct pcap_pkthdr* header;
+        const u_char* packet;
+        int res = pcap_next_ex(pcap, &header, &packet);
+        if (res == 0) continue;
+        if (res == PCAP_ERROR || res == PCAP_ERROR_BREAK) {
+            printf("pcap_next_ex return %d(%s)\n", res, pcap_geterr(pcap));
+            break;
+        }
+
+        // my code start
+
+        //hexdump(packet, header->caplen);
+        dot11.set(packet);
+        dot11.reset();
+
+    }
+    pcap_close(pcap);
+    return 0;
+}
+
+void hexdump(const u_char * packet, bpf_u_int32 len){
+    puts("[TEST Code]");
+    printf("%u bytes captured\n", len);
+    for(unsigned int i = 0; i < len; i++){
+        if((i % 0x10) == 0){
+            puts("");
+        }
+        printf("%02hhx ", packet[i]);
+    }
+    puts("\n");
+}
